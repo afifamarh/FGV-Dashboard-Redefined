@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<!--
+  =====================================================================
+  FGV Prodata — Network & IT Security
+  Security Hardening & Vulnerability Management Dashboard (FYP prototype)
+  Prototype v1.1
+  =====================================================================
+  Multi-file prototype (index.html + css/ + js/ + vendor/). No backend, no build step.
+  Open index.html directly in a modern browser (or with VS Code Live Server). See README.md.
+
+  EXTERNAL DEPENDENCIES (public CDN, no auth/keys required):
+    - Google Fonts (Inter)               https://fonts.googleapis.com
+    - Chart.js 4.4.1 (UMD build)         https://cdnjs.cloudflare.com
+  Chart.js, SheetJS and PDF.js live in vendor/ (local copies); the Inter font falls back to system fonts. No external requests (local hosting).
+  Every imported file is read in the browser only - nothing is uploaded.
+
+  LOGIN — MySQL account authentication with email OTP MFA:
+    Use an active account registered in the MySQL users table. A 6-digit email OTP is required after password verification.
+
+  DATA MODEL (section 3 of the script) — one shared source of truth:
+    endpoints, vulnerabilities, hardeningControls, securityTools,
+    notifications, profile
+  Every KPI, chart, badge, filter, tool card and report is DERIVED from
+  these arrays (section 3b), so numbers stay consistent everywhere.
+  Sample security data uses stored timestamps; real user events (login,
+  report generation, newly added records) use the browser's actual time.
+  No Math.random() is used anywhere.
+
+  PERSISTENCE (localStorage, this browser only): theme, notification
+  preferences, profile (incl. last login / account created), report
+  generation log, demo password. Sample records added in a session are
+  kept in memory and reset on reload.
+
+  FILE STRUCTURE (numbered comment banners inside <style> and <script>):
+    1.  HTML Structure        (<body> markup)
+    2.  CSS / Theme           (<style> — light/dark themes)
+    3.  Shared Sample Data    (endpoints, vulnerabilities, controls, tools, notifications)
+    3b. Derived Data          (all calculated values)
+    4.  Application State     (profile, UI filter state)
+    5.  Authentication        (login, logout, forgot -> reset password)
+    6.  Navigation            (goTo, refreshViews, sidebar)
+    7.  Dashboard (+ 7b Patch Compliance view)
+    8.  Endpoint Security
+    9.  Vulnerability Management
+    10. Security Hardening
+    11. Security Tools
+    12. Reports
+    13. Notifications
+    14. Profile
+    15. Settings (theme / notification preferences)
+    16. Modal support
+    17. Chart Functions
+    18. Export Functions      (CSV export, Copy/Download/Share prototype)
+    19. Utility Functions     (icons, dates, badges, helpers)
+    20. Event Listeners       (search, filters, app bootstrap)
+
+  All sample/demo data is fictional. Hardening controls are a proposed
+  sample baseline, not actual FGV Prodata policies.
+  =====================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FGV Prodata &mdash; Security Hardening &amp; Vulnerability Management</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="vendor/chart.js"></script>
+<script src="vendor/xlsx.js"></script>
+<script src="vendor/pdf.js"></script>
+<script src="vendor/pdf.worker.js"></script>
+</head>
+<!-- =====================================================================
+     1. HTML STRUCTURE
+     Sidebar nav -> topbar (search, notifications, profile) -> one
+     <section class="page"> per route, toggled by goTo() in the script.
+     The auth-screen overlay (login / forgot-password gate) sits after
+     the .app div and covers everything until a session exists.
+===================================================================== -->
+<body>
+
+<div class="app">
+
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">__ICON_SHIELD__</div>
+      <div class="brand-text">
+        <div class="b1">FGV Prodata</div>
+        <div class="b2">Network &amp; IT Security</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-footer">Prototype build &middot; sample data only</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menu-btn" onclick="toggleSidebar()">__ICON_MENU__</button>
+      <div>
+        <div class="topbar-title" id="topbar-title">Dashboard</div>
+        <div class="topbar-sub" id="topbar-sub">Security posture overview</div>
+      </div>
+      <div class="search-box">
+        __ICON_SEARCH__
+        <input type="text" id="global-search" placeholder="Search endpoints, vulnerabilities, tools&hellip;">
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="notif-bell">
+          __ICON_BELL__
+          <span class="notif-dot" id="notif-dot"></span>
+        </button>
+        <div class="user-chip" id="profile-trigger">
+          <div class="avatar" id="topbar-avatar"></div>
+          <div class="user-meta">
+            <div class="u1" id="topbar-name">Ainaa</div>
+            <div class="u2" id="topbar-role">Security Analyst (Prototype)</div>
+          </div>
+          <div class="chevron">__ICON_CHEVRON__</div>
+        </div>
+      </div>
+      <div class="notif-panel" id="notif-panel">
+        <div class="notif-panel-head">
+          <h4>Notifications</h4>
+          <div style="display:flex;gap:12px;">
+            <span id="mark-all-read">Mark all read</span>
+            <span id="clear-all-notif" onclick="clearAllNotifications()">Clear all</span>
+          </div>
+        </div>
+        <div class="notif-list" id="notif-list"></div>
+      </div>
+      <div class="profile-menu" id="profile-menu"></div>
+    </header>
+
+    <main class="content" id="content">
+      <!-- ============ DASHBOARD ============ -->
+      <section class="page" id="page-dashboard">
+        <div class="page-head">
+          <div>
+            <h1>Security overview</h1>
+            <p>Consolidated endpoint security posture across Microsoft Defender, SCCM, Kaspersky and Trend Micro Vision One.</p>
+            <div class="data-asof" id="dash-asof"></div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" onclick="refreshDashboard()">__ICON_REFRESH__ Refresh</button>
+          </div>
+        </div>
+
+        <div class="exec-kpi-bar" id="exec-kpi-bar"></div>
+
+        <div class="posture-hero">
+          <div class="posture-ring-wrap">
+            <svg width="132" height="132" viewBox="0 0 132 132">
+              <circle cx="66" cy="66" r="56" stroke="rgba(255,255,255,0.14)" stroke-width="12" fill="none"/>
+              <circle id="posture-ring" cx="66" cy="66" r="56" stroke="#4FD1A5" stroke-width="12" fill="none" stroke-linecap="round"/>
+            </svg>
+            <div class="posture-ring-label">
+              <div class="val" id="posture-score">--</div>
+              <div class="lbl">Hardening score</div>
+            </div>
+          </div>
+          <div class="posture-text">
+            <h2>Overall posture: <span id="posture-status">Calculating&hellip;</span></h2>
+            <p>Composite score from endpoint protection, patch compliance and hardening controls across all four monitored tools. Sample data for prototype purposes.</p>
+          </div>
+          <div class="posture-stats" id="posture-stats"></div>
+        </div>
+
+        <div class="kpi-grid" id="dashboard-kpis"></div>
+
+        <div class="panel-head" style="margin-top:6px;">
+          <div>
+            <h3 style="font-size:15px;">Security tools overview</h3>
+            <div class="panel-sub">Core data sources powering this dashboard &mdash; click a tool for details</div>
+          </div>
+        </div>
+        <div class="grid-4" id="tool-cards" style="margin-bottom:22px;"></div>
+
+        <div class="chart-grid">
+          <div class="panel chart-panel">
+            <div class="panel-head">
+              <div><h3>Endpoint security status</h3><div class="panel-sub">Click a segment to filter endpoints</div></div>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+          </div>
+          <div class="panel chart-panel">
+            <div class="panel-head">
+              <div><h3>Vulnerabilities by severity</h3><div class="panel-sub">Solid bars are unresolved, faded bars are resolved. Click a bar to filter</div></div>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-severity"></canvas></div>
+          </div>
+          <div class="panel chart-panel">
+            <div class="panel-head">
+              <div><h3>Security tool coverage</h3><div class="panel-sub">Healthy vs affected endpoints per tool. Click a bar for details</div></div>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-coverage"></canvas></div>
+          </div>
+          <div class="panel chart-panel">
+            <div class="panel-head">
+              <div><h3>Vulnerability trend</h3><div class="panel-sub">New findings per week (by detected date). Click a point to see that week</div></div>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ENDPOINT SECURITY ============ -->
+      <section class="page" id="page-endpoints">
+        <div class="page-head">
+          <div>
+            <h1>Endpoint security</h1>
+            <p>Combined endpoint status from Microsoft Defender, SCCM, Kaspersky and Trend Micro Vision One.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="openEndpointForm()">__ICON_PLUS__ Add endpoint</button>
+          </div>
+        </div>
+        <div class="table-toolbar">
+          <div class="search-box" style="flex:none;">
+            __ICON_SEARCH__
+            <input type="text" id="endpoint-search" placeholder="Search endpoint, OS, IP, location&hellip;">
+          </div>
+          <select class="filter-select" id="filter-overall">
+            <option value="">Endpoint status: all</option>
+            <option>Protected</option>
+            <option>Attention Required</option>
+            <option>Critical</option>
+            <option>Offline</option>
+          </select>
+          <select class="filter-select" id="filter-defender">
+            <option value="">Defender: all</option>
+            <option value="__affected">Defender: affected only</option>
+            <option>Protected</option>
+            <option>At Risk</option>
+            <option>Offline</option>
+          </select>
+          <select class="filter-select" id="filter-sccm">
+            <option value="">SCCM: all</option>
+            <option value="__affected">SCCM: affected only</option>
+            <option>Compliant</option>
+            <option>Non-Compliant</option>
+          </select>
+          <select class="filter-select" id="filter-kaspersky">
+            <option value="">Kaspersky: all</option>
+            <option value="__affected">Kaspersky: affected only</option>
+            <option>Protected</option>
+            <option>At Risk</option>
+          </select>
+          <select class="filter-select" id="filter-trendmicro">
+            <option value="">Trend Micro: all</option>
+            <option value="__affected">Trend Micro: affected only</option>
+            <option>Low Risk</option>
+            <option>Medium Risk</option>
+            <option>High Risk</option>
+            <option>Critical Risk</option>
+          </select>
+          <select class="filter-select" id="filter-os" title="Operating system (values found in the endpoint data)">
+            <option value="">OS: all</option>
+          </select>
+          <select class="filter-select" id="filter-patch" title="Patch status from the SCCM state of each endpoint">
+            <option value="">Patch status: all</option>
+            <option value="Compliant">Patch: Compliant</option>
+            <option value="Non-Compliant">Patch: Non-Compliant</option>
+            <option value="Unknown">Patch: State Unknown</option>
+          </select>
+          <select class="filter-select" id="filter-lastseen" title="Measured against the latest check-in in the current data">
+            <option value="">Last seen: all</option>
+            <option value="today">Seen Today</option>
+            <option value="7d">Seen Within 7 Days</option>
+            <option value="older">Not Seen for More Than 7 Days</option>
+            <option value="never">Never Seen</option>
+          </select>
+          <select class="filter-select" id="filter-cfg" title="Quick filters">
+            <option value="">Quick filter: all</option>
+            <option value="compliant">Patch: Compliant</option>
+            <option value="noncompliant">Patch: Non-Compliant</option>
+            <option value="missingAgent">SCCM client missing</option>
+            <option value="pendingReboot">Pending reboot</option>
+            <option value="domain">Domain-joined</option>
+            <option value="workgroup">Workgroup</option>
+            <option value="atRisk">At risk (endpoint status)</option>
+            <option value="vulnerable">Vulnerable (open vulnerabilities)</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="clearEndpointFilters()">Clear filters</button>
+        </div>
+        <div class="filter-banner" id="endpoint-filter-banner"></div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="id" onclick="sortEndpointsBy('id')">Endpoint</th>
+                <th data-sort="defender" onclick="sortEndpointsBy('defender')">Defender</th>
+                <th data-sort="sccm" onclick="sortEndpointsBy('sccm')">SCCM</th>
+                <th data-sort="kaspersky" onclick="sortEndpointsBy('kaspersky')">Kaspersky</th>
+                <th data-sort="trendmicro" onclick="sortEndpointsBy('trendmicro')">Trend Micro</th>
+                <th data-sort="overall" onclick="sortEndpointsBy('overall')">Endpoint status</th>
+                <th data-sort="hardening" onclick="sortEndpointsBy('hardening')">Hardening</th>
+                <th data-sort="vulnCount" onclick="sortEndpointsBy('vulnCount')">Open vulnerabilities</th>
+                <th data-sort="lastSeen" onclick="sortEndpointsBy('lastSeen')">Last seen</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="endpoint-tbody"></tbody>
+          </table>
+          <div class="pagination">
+            <span id="endpoint-count"></span>
+            <div class="pg-btns">
+              <select class="filter-select" id="endpoint-page-size" onchange="setEndpointPageSize(this.value)">
+                <option value="10">10 / page</option>
+                <option value="25" selected>25 / page</option>
+                <option value="50">50 / page</option>
+                <option value="100">100 / page</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="endpoint-prev" onclick="changeEndpointPage(-1)">&lsaquo; Prev</button>
+              <span id="endpoint-page-indicator"></span>
+              <button class="btn btn-ghost btn-sm" id="endpoint-next" onclick="changeEndpointPage(1)">Next &rsaquo;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MICROSOFT DEFENDER EDR ============ -->
+      <section class="page" id="page-defender">
+        <div class="page-head">
+          <div>
+            <h1>Microsoft Defender EDR <span class="mock-tag">Prototype Data</span></h1>
+            <p>Endpoint protection, risk and exposure for FGV endpoints. Figures are calculated from the current endpoint data, including CSV imports. Select a card or bar to see the matching endpoints.</p>
+          </div>
+        </div>
+        <div class="sample-note">__ICON_INFO__<span>Prototype data only &mdash; this page is not connected to Microsoft Defender. Risk level comes from the Defender status field and exposure level from a prototype exposure field. The real export column names are still to be confirmed with the supervisor.</span></div>
+        <div class="def-kpis" id="def-kpis"></div>
+        <div class="grid-2" style="margin-bottom:18px;">
+          <div class="panel" id="def-domain-panel"></div>
+          <div class="panel" id="def-dist-panel"></div>
+        </div>
+        <div class="panel" id="def-top5-panel"></div>
+      </section>
+
+      <!-- ============ VULNERABILITY MANAGEMENT ============ -->
+      <section class="page" id="page-vulnerabilities">
+        <div class="page-head">
+          <div>
+            <h1>Vulnerability management</h1>
+            <p>Track and remediate vulnerabilities detected across all four security tools.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="openVulnForm()">__ICON_PLUS__ Add vulnerability</button>
+          </div>
+        </div>
+        <div class="kpi-grid" id="vuln-kpis"></div>
+        <div class="table-toolbar">
+          <div class="search-box" style="flex:none;">
+            __ICON_SEARCH__
+            <input type="text" id="vuln-search" placeholder="Search vulnerability ID or endpoint&hellip;">
+          </div>
+          <select class="filter-select" id="filter-vuln-severity">
+            <option value="">Severity: all</option>
+            <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+          </select>
+          <select class="filter-select" id="filter-vuln-status">
+            <option value="">Status: all</option>
+            <option>Open</option><option>In Progress</option><option>Resolved</option>
+          </select>
+          <select class="filter-select" id="filter-vuln-source">
+            <option value="">Tool: all</option>
+            <option>Microsoft Defender</option><option>SCCM</option><option>Kaspersky</option><option>Trend Micro Vision One</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="clearVulnFilters()">Clear filters</button>
+        </div>
+        <div class="filter-banner" id="vuln-filter-banner"></div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="id" onclick="sortVulnBy('id')">Vulnerability ID</th>
+                <th data-sort="severity" onclick="sortVulnBy('severity')">Severity</th>
+                <th data-sort="endpoint" onclick="sortVulnBy('endpoint')">Endpoint</th>
+                <th>Description</th>
+                <th data-sort="source" onclick="sortVulnBy('source')">Source</th>
+                <th data-sort="detected" onclick="sortVulnBy('detected')">Detected</th>
+                <th data-sort="status" onclick="sortVulnBy('status')">Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="vuln-tbody"></tbody>
+          </table>
+          <div class="pagination">
+            <span id="vuln-count"></span>
+            <div class="pg-btns">
+              <select class="filter-select" id="vuln-page-size" onchange="setVulnPageSize(this.value)">
+                <option value="10">10 / page</option>
+                <option value="25" selected>25 / page</option>
+                <option value="50">50 / page</option>
+                <option value="100">100 / page</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="vuln-prev" onclick="changeVulnPage(-1)">&lsaquo; Prev</button>
+              <span id="vuln-page-indicator"></span>
+              <button class="btn btn-ghost btn-sm" id="vuln-next" onclick="changeVulnPage(1)">Next &rsaquo;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SECURITY HARDENING ============ -->
+      <section class="page" id="page-hardening">
+        <div class="page-head">
+          <div>
+            <h1>Security hardening</h1>
+            <p>Endpoint hardening posture based on data from the four core security tools.</p>
+          </div>
+        </div>
+        <div class="kpi-grid" id="hardening-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr));"></div>
+        <div class="panel chart-panel" style="margin-bottom:18px;">
+          <div class="panel-head">
+            <div><h3>Hardening compliance by control</h3><div class="panel-sub">Share of endpoints meeting each control. Click a bar for affected endpoints</div></div>
+          </div>
+          <div class="chart-wrap xl"><canvas id="chart-hardening"></canvas></div>
+        </div>
+        <div class="sample-note" id="hardening-note">__ICON_INFO__<span>The controls below are a <b>proposed sample baseline</b> for demonstrating this prototype. They are not FGV Prodata&rsquo;s actual security policies. Compliance thresholds used: 85% and above is compliant, 65&ndash;84% needs attention, below 65% is non-compliant.</span></div>
+        <div class="filter-banner" id="hardening-filter-banner"></div>
+        <div class="table-scroll" id="hardening-table">
+          <table>
+            <thead>
+              <tr><th>Security control</th><th>Expected status</th><th>Current status</th><th>Compliance</th><th>Affected endpoints</th><th>Remediation</th></tr>
+            </thead>
+            <tbody id="hardening-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ SCCM PATCH MANAGEMENT ============ -->
+      <section class="page" id="page-sccm">
+        <div class="page-head">
+          <div>
+            <h1>SCCM Patch Management <span class="mock-tag">Prototype Data</span></h1>
+            <p>Patch compliance for FGV endpoints using the supervisor's SCCM formula. Figures are calculated from the active SCCM dataset, including CSV imports. Select a card or bar to see the matching assets.</p>
+          </div>
+        </div>
+        <div class="sample-note">__ICON_INFO__<span>Prototype data only &mdash; this page is not connected to SCCM. The Out of Coverage rule (external IP / 192.168.x.x) and the CSV field names are prototype assumptions still to be confirmed with the supervisor.</span></div>
+        <div class="def-kpis sccm-kpis" id="sccm-kpis"></div>
+        <div class="grid-2" style="margin-bottom:18px;">
+          <div class="panel" id="sccm-breakdown-panel"></div>
+          <div class="panel" id="sccm-target-panel"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-kaspersky"><div class="page-head"><div><h1>Kaspersky XDR <span class="mock-tag">Sample Data</span></h1><p>FELDA asset distribution, HQ / Branch / Server classification and location (Domain = HQ, Workgroup = Branch).</p></div></div><div class="sample-note"><span>Fictional sample data only &mdash; not connected to Kaspersky.</span></div><div id="kas-root"></div></section>
+      <section class="page" id="page-trendmicro"><div class="page-head"><div><h1>Trend Micro Vision One / CRAM <span class="mock-tag">Sample Data</span></h1><p>24/7 SOC monitoring and CRAM server vulnerability information.</p></div></div><div class="sample-note"><span>Fictional sample data only &mdash; DEMO servers and placeholder CVE-2099-* IDs.</span></div><div id="tm-root"></div></section>
+      <section class="page" id="page-audit"><div class="page-head"><div><h1>Audit Trail</h1><p>Login/logout, CSV upload, data override and export activity (IT Security Admin only).</p></div></div><div id="aud-root"></div></section>
+      <!-- ============ SECURITY TOOLS ============ -->
+      <section class="page" id="page-tools">
+        <div class="page-head">
+          <div>
+            <h1>Security tools</h1>
+            <p>The four core data sources behind this dashboard. Select a tool for a detailed breakdown.</p>
+          </div>
+        </div>
+        <div class="grid-4" id="tools-page-cards"></div>
+      </section>
+
+      <!-- ============ REPORTS ============ -->
+      <section class="page" id="page-reports">
+        <div class="page-head">
+          <div>
+            <h1>Reports</h1>
+            <p>Generate and export security reports summarizing dashboard data.</p>
+          </div>
+        </div>
+        <div id="import-panel"></div>
+        <div class="grid-3" id="report-cards"></div>
+      </section>
+
+      <!-- ============ ENDPOINT HISTORY ============ -->
+      <section class="page" id="page-history">
+        <div class="page-head">
+          <div>
+            <h1>Endpoint History <span class="mock-tag">Prototype Data</span></h1>
+            <p>Centralized endpoint activity across the security tools your role can access, newest first.</p>
+          </div>
+        </div>
+        <div class="sample-note">__ICON_INFO__<span>Sample history only &mdash; these activity records are generated from the prototype endpoint data to demonstrate the page. They are not real production events or telemetry.</span></div>
+        <div class="def-kpis sccm-kpis" id="history-kpis"></div>
+        <div class="table-toolbar">
+          <div class="search-box" style="flex:none;">
+            __ICON_SEARCH__
+            <input type="text" id="history-search" placeholder="Search endpoint, tool, activity&hellip;" oninput="historyPage=1;renderHistoryPage()">
+          </div>
+          <input type="date" id="history-from" title="From date" onchange="historyPage=1;renderHistoryPage()" style="border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 10px;font-size:12.5px;color:var(--text);outline:none;">
+          <input type="date" id="history-to" title="To date" onchange="historyPage=1;renderHistoryPage()" style="border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 10px;font-size:12.5px;color:var(--text);outline:none;">
+          <select class="filter-select" id="history-endpoint" onchange="historyPage=1;renderHistoryPage()"></select>
+          <select class="filter-select" id="history-location" onchange="historyPage=1;renderHistoryPage()"></select>
+          <select class="filter-select" id="history-tool" onchange="historyPage=1;renderHistoryPage()"></select>
+          <select class="filter-select" id="history-activity" onchange="historyPage=1;renderHistoryPage()"></select>
+          <select class="filter-select" id="history-status" onchange="historyPage=1;renderHistoryPage()"></select>
+          <button class="btn btn-ghost btn-sm" onclick="clearHistoryFilters()">Clear filters</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="time" onclick="sortHistoryBy('time')">Date &amp; Time</th>
+                <th data-sort="endpoint" onclick="sortHistoryBy('endpoint')">Endpoint</th>
+                <th>Location</th>
+                <th>Security Tool</th>
+                <th>Activity</th>
+                <th data-sort="status" onclick="sortHistoryBy('status')">Status</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+          <div class="pagination">
+            <span id="history-count"></span>
+            <div class="pg-btns">
+              <button class="btn btn-ghost btn-sm" id="history-prev" onclick="changeHistoryPage(-1)">&lsaquo; Prev</button>
+              <span id="history-page-indicator"></span>
+              <button class="btn btn-ghost btn-sm" id="history-next" onclick="changeHistoryPage(1)">Next &rsaquo;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="page" id="page-settings">
+        <div class="page-head">
+          <div>
+            <h1>Settings</h1>
+            <p>Basic dashboard preferences for this prototype.</p>
+          </div>
+        </div>
+
+        <div class="section-label" style="margin-top:0;">Account</div>
+        <div class="panel" style="max-width:640px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+            <div class="avatar avatar-lg" id="settings-avatar"></div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:14px;" id="settings-name"></div>
+              <div style="font-size:12px;color:var(--text-muted);" id="settings-role"></div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="openEditProfile()">Edit profile</button>
+          </div>
+          <div class="settings-row">
+            <div><div class="s1">Email</div><div class="s2" id="settings-email"></div></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="s1">Phone</div><div class="s2" id="settings-phone"></div></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="s1">Last login</div><div class="s2" id="settings-lastlogin"></div></div>
+            <div style="text-align:right;"><div class="s1">Account created</div><div class="s2" id="settings-created"></div></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="s1">Account status</div><div class="s2">Current access status for this prototype account</div></div>
+            <span class="badge badge-green" id="settings-status">Active</span>
+          </div>
+        </div>
+
+        <div class="section-label">Appearance</div>
+        <div class="panel" style="max-width:640px;margin-bottom:20px;">
+          <div class="settings-row">
+            <div><div class="s1">Theme</div><div class="s2">Switch between light and dark across the whole dashboard</div></div>
+            <div class="segmented" id="theme-segmented">
+              <button type="button" onclick="applyTheme('light')" data-theme-btn="light">__ICON_SUN__ Light</button>
+              <button type="button" onclick="applyTheme('dark')" data-theme-btn="dark">__ICON_MOON__ Dark</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-label">Notifications</div>
+        <div class="panel" style="max-width:640px;margin-bottom:20px;">
+          <div class="settings-row">
+            <div><div class="s1">Security alerts</div><div class="s2">Notify when protection status changes across any of the four tools</div></div>
+            <label class="switch"><input type="checkbox" role="switch" id="notif-pref-security" onchange="setNotifPref('security', this.checked)"><span class="slider-track"></span></label>
+          </div>
+          <div class="settings-row">
+            <div><div class="s1">Vulnerability alerts</div><div class="s2">Notify when a new vulnerability is detected</div></div>
+            <label class="switch"><input type="checkbox" role="switch" id="notif-pref-vulnerability" onchange="setNotifPref('vulnerability', this.checked)"><span class="slider-track"></span></label>
+          </div>
+          <div class="settings-row">
+            <div><div class="s1">Endpoint alerts</div><div class="s2">Notify when an endpoint becomes non-compliant or goes offline</div></div>
+            <label class="switch"><input type="checkbox" role="switch" id="notif-pref-endpoint" onchange="setNotifPref('endpoint', this.checked)"><span class="slider-track"></span></label>
+          </div>
+        </div>
+
+        <div id="sccm-kpi-settings">
+          <div class="section-label">SCCM Patch Management KPI cards</div>
+          <div class="panel" style="max-width:640px;margin-bottom:20px;">
+            <div class="settings-row">
+              <div><div class="s1">Current Compliance</div><div class="s2">Show the Current Compliance card (same figure as Total Percentage)</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="sccm-kpi-pref-currentCompliance" onchange="setSccmKpiPref('currentCompliance', this.checked)"><span class="slider-track"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><div class="s1">Target</div><div class="s2">Show the compliance Target card</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="sccm-kpi-pref-target" onchange="setSccmKpiPref('target', this.checked)"><span class="slider-track"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><div class="s1">Pending Reboot</div><div class="s2">Show assets patched but awaiting a restart</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="sccm-kpi-pref-pendingReboot" onchange="setSccmKpiPref('pendingReboot', this.checked)"><span class="slider-track"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><div class="s1">Deployment Success Rate</div><div class="s2">Show the sample deployment success rate</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="sccm-kpi-pref-deploymentSuccess" onchange="setSccmKpiPref('deploymentSuccess', this.checked)"><span class="slider-track"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><div class="s1">Hostname Mismatch</div><div class="s2">Show assets whose name differs between tools</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="sccm-kpi-pref-hostnameMismatch" onchange="setSccmKpiPref('hostnameMismatch', this.checked)"><span class="slider-track"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <div id="kas-kpi-settings">
+          <div class="section-label">Kaspersky XDR KPI cards</div>
+          <div class="panel" style="max-width:640px;margin-bottom:20px;">
+            <div class="settings-row">
+              <div><div class="s1">At Risk</div><div class="s2">Show the At Risk card</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="kas-kpi-pref-atRisk" onchange="setKasKpiPref('atRisk', this.checked)"><span class="slider-track"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><div class="s1">Offline</div><div class="s2">Show the Offline card</div></div>
+              <label class="switch"><input type="checkbox" role="switch" id="kas-kpi-pref-offline" onchange="setKasKpiPref('offline', this.checked)"><span class="slider-track"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;margin-bottom:24px;">
+          <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+        </div>
+
+        <div class="section-label">Prototype information</div>
+        <div class="panel" style="max-width:640px;">
+          <div class="detail-grid" style="margin-bottom:16px;">
+            <div class="detail-row"><span class="k">Project title</span><span class="v">Security Hardening &amp; Vulnerability Management Dashboard</span></div>
+            <div class="detail-row"><span class="k">Organization</span><span class="v">FGV Prodata</span></div>
+            <div class="detail-row"><span class="k">Prototype type</span><span class="v">Front-end functional prototype</span></div>
+            <div class="detail-row"><span class="k">Data</span><span class="v">Sample / dummy data</span></div>
+            <div class="detail-row"><span class="k">Backend</span><span class="v">Not connected</span></div>
+            <div class="detail-row"><span class="k">Version</span><span class="v">Prototype v1.1</span></div>
+            <div class="detail-row"><span class="k">Last updated</span><span class="v" id="proto-last-updated">&mdash;</span></div>
+          </div>
+          <div class="form-hint" style="margin-bottom:14px;">This prototype is a single self-contained HTML file with no server or external database. It is safe to copy, download or hand to another AI assistant to continue development.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="copyPrototypeCode()">__ICON_COPY__ Copy source code</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadPrototypeHtml()">__ICON_DOWNLOAD__ Download HTML</button>
+            <button class="btn btn-secondary btn-sm" onclick="sharePrototype()">__ICON_SHARE__ Share prototype</button>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ============ ADMIN USER MANAGEMENT ============ -->
+      <section class="page" id="page-users" hidden>
+        <div class="page-head">
+          <div><h1>User Management</h1><p>Create dashboard accounts and review existing users stored in MySQL.</p></div>
+          <div class="page-actions"><button class="btn btn-secondary" type="button" onclick="loadManagedUsers()">Refresh users</button></div>
+        </div>
+        <div id="users-feedback" role="status" style="display:none;margin:0 0 16px;padding:12px 14px;border-radius:10px;"></div>
+        <div class="grid-2" style="align-items:start;gap:20px;">
+          <div class="panel" style="padding:22px;">
+            <div class="panel-head"><div><h3>Create User</h3><div class="panel-sub">New accounts can log in using the existing email OTP verification.</div></div></div>
+            <form id="create-user-form" style="display:grid;gap:14px;">
+              <label style="display:grid;gap:6px;font-size:13px;font-weight:600;">Full name<input class="form-input" id="new-user-name" name="full_name" maxlength="150" required autocomplete="name" placeholder="Enter full name"></label>
+              <label style="display:grid;gap:6px;font-size:13px;font-weight:600;">Email address<input class="form-input" id="new-user-email" name="email" type="email" required autocomplete="email" placeholder="name@company.com"></label>
+              <label style="display:grid;gap:6px;font-size:13px;font-weight:600;">Phone number<input class="form-input" id="new-user-phone" name="phone_number" type="tel" autocomplete="tel" placeholder="e.g. +60123456789"></label>
+              <label style="display:grid;gap:6px;font-size:13px;font-weight:600;">Password<input class="form-input" id="new-user-password" name="password" type="password" minlength="12" required autocomplete="new-password" placeholder="At least 12 characters"><small style="font-weight:400;color:var(--text-muted,#7b8494);">Use at least 12 characters.</small></label>
+              <label style="display:grid;gap:6px;font-size:13px;font-weight:600;">Retype password<input class="form-input" id="new-user-password-confirm" name="password_confirm" type="password" minlength="12" required autocomplete="new-password" placeholder="Retype password"></label>
+              <label style="display:grid;gap:6px;font-size:13px;font-weight:600;">Role<select class="filter-select" id="new-user-role" name="role" required style="width:100%;"><option value="">Select role</option><option value="Admin">Admin</option><option value="FGV Management">FGV Management</option><option value="FELDA Management">FELDA Management</option></select></label>
+              <button class="btn btn-primary" id="create-user-submit" type="submit" style="justify-content:center;">Create User</button>
+            </form>
+          </div>
+          <div class="panel" style="padding:22px;">
+            <div class="panel-head"><div><h3>Account summary</h3><div class="panel-sub">Live count from the users table.</div></div></div>
+            <div class="kpi-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+              <div class="kpi-card"><div class="kpi-label">Total users</div><div class="kpi-value" id="users-total">—</div></div>
+              <div class="kpi-card"><div class="kpi-label">Active users</div><div class="kpi-value" id="users-active">—</div></div>
+            </div>
+            <div class="form-hint" style="margin-top:12px;">Account passwords are hashed by the backend before saving. Existing accounts and imported security data are not reset or deleted.</div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:20px;padding:20px;">
+          <div class="panel-head"><div><h3>Existing users</h3><div class="panel-sub">Passwords are never displayed here.</div></div></div>
+          <div class="table-scroll"><table><thead><tr><th>ID</th><th>Full name</th><th>Email</th><th>Phone number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="managed-users-tbody"><tr><td colspan="7">Loading users…</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+    </main>
+    <footer class="app-footer" id="app-footer">© Copyright FGV Holdings Berhad / Network &amp; IT Security. All Rights Reserved.</footer>
+  </div>
+</div>
+
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-mark">__ICON_SHIELDPLAIN__</div>
+    <h2>FGV Prodata</h2>
+    <p class="auth-sub">Network &amp; IT Security &mdash; Security Hardening &amp; Vulnerability Management</p>
+
+    <!-- Login -->
+    <div class="auth-view" id="auth-view-login">
+      <div class="auth-message" id="auth-message">__ICON_CHECK__<span id="auth-message-text">You have been logged out.</span></div>
+      <div class="auth-error" id="auth-error">__ICON_X__<span id="auth-error-text">Invalid username or password.</span></div>
+      <form id="login-form" onsubmit="return attemptLogin(event)" novalidate>
+        <div class="auth-field">
+          <label for="login-username">Username</label>
+          <div class="auth-input-wrap">
+            __ICON_USER_INPUT__
+            <input id="login-username" type="text" autocomplete="username" placeholder="admin">
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="login-password">Password</label>
+          <div class="auth-input-wrap">
+            __ICON_LOCK_INPUT__
+            <input id="login-password" type="password" autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" style="padding-right:38px;">
+            <button type="button" class="pw-toggle" id="pw-toggle-btn" onclick="togglePasswordVisibility()" aria-label="Show password">__ICON_EYE_TOGGLE__</button>
+          </div>
+        </div>
+        <div class="auth-row">
+          <label class="auth-remember"><input type="checkbox" id="login-remember"> Remember me</label>
+          <button type="button" class="auth-forgot" id="forgot-link" onclick="openForgotPassword()">Forgot password?</button>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Log in</button>
+      </form>
+      <div class="auth-demo" id="auth-demo" hidden></div>
+    </div>
+
+    <!-- Login MFA OTP: separate from the Forgot Password OTP flow -->
+    <div class="auth-view" id="auth-view-login-otp" hidden>
+      <h3 class="auth-view-title">Verify your sign-in</h3>
+      <p class="auth-view-text">We sent a 6-digit verification code to <strong id="login-otp-email"></strong>. The code expires in 5 minutes.</p>
+      <div class="auth-field">
+        <label for="login-otp-code">6-digit OTP</label>
+        <div class="auth-input-wrap"><input id="login-otp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></div>
+        <div class="field-error" id="login-otp-error">Enter the 6-digit OTP.</div>
+      </div>
+      <button type="button" class="btn btn-primary" id="verify-login-otp-btn" style="width:100%;justify-content:center;" onclick="verifyLoginOtp()">Verify and log in</button>
+      <button type="button" class="auth-back" onclick="cancelLoginOtp()">Back to login</button>
+    </div>
+
+    <!-- Forgot password -->
+    <div class="auth-view" id="auth-view-forgot" hidden>
+      <h3 class="auth-view-title">Forgot password</h3>
+      <p class="auth-view-text">Enter your FGV Holdings work email. We&rsquo;ll send instructions to reset your password (simulated in this prototype).</p>
+      <form onsubmit="return sendResetLink(event)" novalidate>
+        <div class="auth-field">
+          <label for="fp-email">Work email</label>
+          <div class="auth-input-wrap">
+            __ICON_MAIL_INPUT__
+            <input id="fp-email" type="email" autocomplete="email" placeholder="name@fgvholdings.com">
+          </div>
+          <div class="field-error" id="fp-error">Enter a valid @fgvholdings.com email address.</div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Send reset link</button>
+      </form>
+      <button type="button" class="auth-back" onclick="backToLogin()">__ICON_ARROWLEFT__ Back to login</button>
+    </div>
+
+   <!-- OTP verification -->
+<div class="auth-view" id="auth-view-sent" hidden>
+  <h3 class="auth-view-title">Verify your email</h3>
+
+  <div class="auth-message show">
+    __ICON_CHECK__
+    <span>OTP sent successfully.</span>
+  </div>
+
+  <p class="auth-view-text" id="fp-sent-text"></p>
+
+  <form onsubmit="verifyResetOtp(); return false;" novalidate>
+    <div class="auth-field">
+      <label for="fp-otp">Enter 6-digit OTP</label>
+
+      <div class="auth-input-wrap">
+        <input
+          id="fp-otp"
+          type="text"
+          inputmode="numeric"
+          maxlength="6"
+          autocomplete="one-time-code"
+          placeholder="Enter OTP from Gmail"
+        >
+      </div>
+
+      <div class="field-error" id="fp-otp-error"></div>
+    </div>
+
+    <button
+      type="submit"
+      class="btn btn-primary"
+      id="verify-otp-btn"
+      style="width:100%;justify-content:center;"
+    >
+      Verify OTP
+    </button>
+  </form>
+
+  <p class="auth-view-text" style="margin:12px 0 0;text-align:center;">
+    Didn't get it?
+    <button
+      type="button"
+      class="auth-link-btn"
+      onclick="openForgotPassword(true)"
+    >
+      Try another email
+    </button>
+  </p>
+
+  <button
+    type="button"
+    class="auth-back"
+    onclick="backToLogin()"
+  >
+    ← Back to login
+  </button>
+</div>
+    <!-- Reset password -->
+    <div class="auth-view" id="auth-view-reset" hidden>
+      <h3 class="auth-view-title">Reset password</h3>
+      <p class="auth-view-text" id="rp-for-text">Choose a new password for your account.</p>
+      <form onsubmit="return submitPasswordReset(event)" novalidate>
+        <div class="auth-field">
+          <label for="rp-new">New password</label>
+          <div class="auth-input-wrap">
+            __ICON_LOCK_INPUT__
+            <input id="rp-new" type="password" autocomplete="new-password" placeholder="At least 8 characters" oninput="updatePasswordRules()">
+          </div>
+        </div>
+        <ul class="pw-rules" id="pw-rules">
+          <li data-rule="len">At least 8 characters</li>
+          <li data-rule="mix">Contains a letter and a number</li>
+          <li data-rule="match">Both passwords match</li>
+        </ul>
+        <div class="auth-field">
+          <label for="rp-confirm">Confirm new password</label>
+          <div class="auth-input-wrap">
+            __ICON_LOCK_INPUT__
+            <input id="rp-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new password" oninput="updatePasswordRules()">
+          </div>
+          <div class="field-error" id="rp-error"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Update password</button>
+      </form>
+      <button type="button" class="auth-back" onclick="backToLogin()">__ICON_ARROWLEFT__ Back to login</button>
+    </div>
+
+    <!-- Password updated -->
+<div class="auth-view" id="auth-view-done" hidden>
+  <div class="auth-message show">
+    __ICON_CHECK__
+    <span id="done-message">Password updated successfully.</span>
+  </div>
+
+  <p class="auth-view-text" id="done-text">
+    Your password has been updated. You can now log in with your new password.
+  </p>
+
+  <button
+    type="button"
+    class="btn btn-primary"
+    style="width:100%;justify-content:center;"
+    onclick="backToLogin(true)"
+  >
+    Back to login
+  </button>
+</div>
+
+    <div class="auth-hint">Prototype only &mdash; no real authentication is performed.</div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="js/utilities.js"></script>
+<script src="js/data.js"></script>
+<script src="js/derived-data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/security-tools.js"></script>
+<script src="js/endpoint-security.js"></script>
+<script src="js/vulnerability.js"></script>
+<script src="js/security-hardening.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/exports.js"></script>
+<script src="js/import-reports.js"></script>
+<script src="js/modals.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/additions.js"></script>
+<script src="js/refinements.js"></script>
+<script src="js/app.js"></script>
+<script src="js/user-management.js"></script>
+</body>
+</html>
