@@ -1,0 +1,12 @@
+.vs/
+bin/
+obj/
+node_modules/
+dist/
+*.user
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+FGV-Prodata-Security-Dashboard/Backend/.fgv_admin_token_secret

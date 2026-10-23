@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="../../FGV.Dashboard.Web/FGV.Dashboard.Web.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="FGV.Dashboard.Api/FGV.Dashboard.Api.csproj" />
+  <Project Path="FGV.Dashboard.Application/FGV.Dashboard.Application.csproj" />
+  <Project Path="FGV.Dashboard.Infrastructure/FGV.Dashboard.Infrastructure.csproj" />
+</Solution>
