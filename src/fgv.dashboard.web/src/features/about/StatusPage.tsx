@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { fetchAppInfo } from './features/about/appInfo';
-import type { AppInfo } from './features/about/appInfo';
+import { fetchAppInfo } from './appInfo';
+import type { AppInfo } from './appInfo';
 
-export default function App() {
+export default function StatusPage() {
     const [info, setInfo] = useState<AppInfo | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -20,8 +20,11 @@ export default function App() {
     }, []);
 
     return (
-        <main style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
-            <h1>FGV Prodata Security Dashboard</h1>
+        <section>
+            <header className="page-head">
+                <h1>System status</h1>
+                <p>Response from the API.</p>
+            </header>
             {error && <p role="alert">Could not reach the API: {error}</p>}
             {!info && !error && <p>Loading…</p>}
             {info && (
@@ -32,6 +35,6 @@ export default function App() {
                     <dt>Server time (UTC)</dt><dd>{info.serverTimeUtc}</dd>
                 </dl>
             )}
-        </main>
+        </section>
     );
 }

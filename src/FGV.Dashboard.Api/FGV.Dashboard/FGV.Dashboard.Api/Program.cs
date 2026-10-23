@@ -1,3 +1,6 @@
+using FGV.Dashboard.Application.Dashboard;
+using FGV.Dashboard.Application.Security;
+using FGV.Dashboard.Infrastructure.SampleData;
 using FGV.Dashboard.Application.About;
 using FGV.Dashboard.Infrastructure.About;
 
@@ -6,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ISecurityDataSource, SyntheticSecurityDataSource>();
+builder.Services.AddScoped<DashboardService>();
 
 builder.Services.AddSingleton<IAppInfoProvider>(
     new AppInfoProvider(builder.Environment.EnvironmentName));

@@ -1,0 +1,213 @@
+.data-asof {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* Executive KPI bar */
+.exec-kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.exec-kpi-item {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    border-right: 1px solid var(--border);
+    text-align: left;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: background .12s;
+}
+
+    .exec-kpi-item:last-child {
+        border-right: none;
+    }
+
+    .exec-kpi-item:hover {
+        background: var(--blue-light);
+    }
+
+.exec-kpi-label, .exec-kpi-value, .exec-kpi-sub {
+    display: block;
+}
+
+.exec-kpi-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.exec-kpi-value {
+    font-size: 25px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+}
+
+.exec-kpi-sub {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 4px;
+}
+
+/* Posture hero */
+.posture-hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%);
+    border-radius: var(--radius-lg);
+    padding: 26px 28px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+
+.posture-ring-wrap {
+    flex-shrink: 0;
+    width: 132px;
+    height: 132px;
+    position: relative;
+}
+
+    .posture-ring-wrap svg {
+        transform: rotate(-90deg);
+    }
+
+.posture-ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+    .posture-ring-label .val {
+        font-size: 26px;
+        font-weight: 800;
+    }
+
+    .posture-ring-label .lbl {
+        font-size: 10.5px;
+        color: #B9C7E8;
+        margin-top: 1px;
+    }
+
+.posture-text {
+    flex: 1;
+    min-width: 220px;
+}
+
+    .posture-text h2 {
+        margin: 0 0 6px;
+        font-size: 17px;
+        font-weight: 700;
+    }
+
+    .posture-text p {
+        margin: 0;
+        color: #C4D0EC;
+        font-size: 13px;
+        max-width: 480px;
+    }
+
+.posture-stats {
+    display: flex;
+    gap: 26px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.posture-stat {
+    text-align: center;
+}
+
+    .posture-stat .n {
+        font-size: 20px;
+        font-weight: 800;
+    }
+
+    .posture-stat .l {
+        font-size: 11px;
+        color: #AEC0E5;
+    }
+
+/* KPI cards */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+}
+
+.kpi-card {
+    font: inherit;
+    color: inherit;
+    text-align: center;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    cursor: pointer;
+    transition: box-shadow .15s, border-color .15s;
+}
+
+    .kpi-card:hover {
+        box-shadow: var(--shadow-lg);
+        border-color: #C9D4EA;
+    }
+
+.kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.kpi-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kpi-label {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.kpi-value {
+    display: block;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.kpi-sub {
+    display: block;
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 3px;
+}
+
+.exec-kpi-item:focus-visible, .kpi-card:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+}
