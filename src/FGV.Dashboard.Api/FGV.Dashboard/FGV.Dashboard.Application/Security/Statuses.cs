@@ -9,4 +9,6 @@ namespace FGV.Dashboard.Application.Security
     public enum RiskLevel { Unknown, Low, Medium, High, Critical }
     public enum Severity { Critical, High, Medium, Low }
     public enum OverallStatus { Unknown, Protected, AttentionRequired, Critical, Offline }
+
+    public enum SecurityTool { Defender, Sccm, Kaspersky, TrendMicro }
 }

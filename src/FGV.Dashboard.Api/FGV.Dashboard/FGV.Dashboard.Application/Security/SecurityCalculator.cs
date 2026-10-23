@@ -11,13 +11,20 @@ namespace FGV.Dashboard.Application.Security
         public const int PatchSlaPercent = 90;
         public const int SccmTargetPercent = 80;
 
-        public static PatchState EvaluatePatch(int applicable, int installed)
+        public static int? PatchPercent(int applicable, int installed)
         {
-            if (applicable <= 0) return PatchState.Unknown;
+            if (applicable <= 0) return null;
             var clamped = Math.Min(applicable, Math.Max(0, installed));
-            var percent = Math.Round(clamped * 100.0 / applicable, MidpointRounding.AwayFromZero);
-            return percent >= PatchSlaPercent ? PatchState.Compliant : PatchState.NonCompliant;
+            return (int)Math.Round(clamped * 100.0 / applicable, MidpointRounding.AwayFromZero);
         }
+
+        public static PatchState EvaluatePatch(int applicable, int installed) =>
+            PatchPercent(applicable, installed) switch
+            {
+                null => PatchState.Unknown,
+                >= PatchSlaPercent => PatchState.Compliant,
+                _ => PatchState.NonCompliant,
+            };
     }
 
     public static class SecurityCalculator
@@ -102,6 +109,92 @@ namespace FGV.Dashboard.Application.Security
                 total, compliant, nonCompliant, unknown, outOfCoverage, within,
                 problemToResolve, pct, SecurityPolicy.SccmTargetPercent,
                 pct >= SecurityPolicy.SccmTargetPercent);
+        }
+
+        public static SeverityCounts CountBySeverity(IEnumerable<Vulnerability> vulnerabilities)
+        {
+            var list = vulnerabilities.ToList();
+            return new SeverityCounts(
+                list.Count(v => v.Severity == Severity.Critical),
+                list.Count(v => v.Severity == Severity.High),
+                list.Count(v => v.Severity == Severity.Medium),
+                list.Count(v => v.Severity == Severity.Low));
+        }
+
+        // Prototype definition kept from the old app: healthy = total endpoints - affected endpoints.
+        public static ToolSummary SummarizeTool(
+            SecurityTool tool,
+            IReadOnlyCollection<EndpointAsset> fleet,
+            IReadOnlyCollection<Vulnerability> openVulnerabilities)
+        {
+            var openFindings = openVulnerabilities.Count(v => v.Source == tool);
+
+            int Count(Func<EndpointAsset, bool> predicate) => fleet.Count(predicate);
+
+            ToolSummary Build(string key, string name, int affected, Dictionary<string, int> counts) =>
+                new(key, name, fleet.Count - affected, affected, openFindings, counts);
+
+            return tool switch
+            {
+                SecurityTool.Defender => Build("defender", "Microsoft Defender",
+                    Count(e => e.Defender is ProtectionStatus.AtRisk or ProtectionStatus.Offline),
+                    new()
+                    {
+                        ["protected"] = Count(e => e.Defender == ProtectionStatus.Protected),
+                        ["atRisk"] = Count(e => e.Defender == ProtectionStatus.AtRisk),
+                        ["offline"] = Count(e => e.Defender == ProtectionStatus.Offline),
+                    }),
+                SecurityTool.Sccm => Build("sccm", "SCCM",
+                    Count(e => e.Patch == PatchState.NonCompliant),
+                    new()
+                    {
+                        ["compliant"] = Count(e => e.Patch == PatchState.Compliant),
+                        ["nonCompliant"] = Count(e => e.Patch == PatchState.NonCompliant),
+                        ["unknown"] = Count(e => e.Patch == PatchState.Unknown),
+                    }),
+                SecurityTool.Kaspersky => Build("kaspersky", "Kaspersky",
+                    Count(e => e.Kaspersky == ProtectionStatus.AtRisk),
+                    new()
+                    {
+                        ["protected"] = Count(e => e.Kaspersky == ProtectionStatus.Protected),
+                        ["atRisk"] = Count(e => e.Kaspersky == ProtectionStatus.AtRisk),
+                    }),
+                SecurityTool.TrendMicro => Build("trendmicro", "Trend Micro Vision One",
+                    Count(e => e.TrendMicro is RiskLevel.High or RiskLevel.Critical),
+                    new()
+                    {
+                        ["lowOrMediumRisk"] = Count(e => e.TrendMicro is RiskLevel.Low or RiskLevel.Medium),
+                        ["highOrCriticalRisk"] = Count(e => e.TrendMicro is RiskLevel.High or RiskLevel.Critical),
+                    }),
+                _ => throw new ArgumentOutOfRangeException(nameof(tool)),
+            };
+        }
+
+        // New vulnerabilities per Monday-based week, for the 8 weeks ending with the latest detection.
+        public static IReadOnlyList<WeeklyCount> WeeklyVulnerabilityTrend(
+            IReadOnlyCollection<Vulnerability> vulnerabilities,
+            DateTimeOffset fallbackNow,
+            int weeks = 8)
+        {
+            var latest = vulnerabilities.Count > 0
+                ? vulnerabilities.Max(v => v.DetectedUtc)
+                : fallbackNow;
+            var latestDate = DateOnly.FromDateTime(latest.UtcDateTime);
+            var lastWeekStart = latestDate.AddDays(-(((int)latestDate.DayOfWeek + 6) % 7));
+
+            var result = new List<WeeklyCount>();
+            for (var i = weeks - 1; i >= 0; i--)
+            {
+                var start = lastWeekStart.AddDays(-7 * i);
+                var end = start.AddDays(7);
+                var count = vulnerabilities.Count(v =>
+                {
+                    var detected = DateOnly.FromDateTime(v.DetectedUtc.UtcDateTime);
+                    return detected >= start && detected < end;
+                });
+                result.Add(new WeeklyCount(start, count));
+            }
+            return result;
         }
     }
 }

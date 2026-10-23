@@ -74,4 +74,54 @@ public class SecurityCalculatorTests
 
         Assert.Equal(75, SecurityCalculator.FleetHardeningScore(fleet));
     }
+
+    private static Vulnerability Vuln(
+    string id,
+    DateTimeOffset detected,
+    Severity severity = Severity.High,
+    SecurityTool source = SecurityTool.Defender,
+    bool resolved = false) =>
+    new(id, "EP-1", severity, source, resolved, detected);
+
+    [Fact]
+    public void Weekly_trend_has_eight_monday_based_weeks_ending_at_the_latest_detection()
+    {
+        // 2026-10-21 is a Wednesday, so the latest week starts on Monday 2026-10-19.
+        var vulns = new[]
+        {
+            Vuln("V1", new DateTimeOffset(2026, 10, 21, 9, 0, 0, TimeSpan.Zero)),
+            Vuln("V2", new DateTimeOffset(2026, 10, 19, 0, 0, 0, TimeSpan.Zero)),
+            Vuln("V3", new DateTimeOffset(2026, 10, 12, 23, 59, 0, TimeSpan.Zero)),
+        };
+
+        var trend = SecurityCalculator.WeeklyVulnerabilityTrend(vulns, DateTimeOffset.UnixEpoch);
+
+        Assert.Equal(8, trend.Count);
+        Assert.Equal(new DateOnly(2026, 10, 19), trend[^1].WeekStart);
+        Assert.Equal(2, trend[^1].Count);
+        Assert.Equal(1, trend[^2].Count);
+    }
+
+    [Fact]
+    public void Tool_summary_counts_affected_endpoints_and_open_findings()
+    {
+        var fleet = new[]
+        {
+            Asset("A"),
+            Asset("B", defender: ProtectionStatus.AtRisk),
+            Asset("C", defender: ProtectionStatus.Offline),
+        };
+        var open = new[]
+        {
+            Vuln("V1", DateTimeOffset.UnixEpoch),
+            Vuln("V2", DateTimeOffset.UnixEpoch, source: SecurityTool.Sccm),
+        };
+
+        var summary = SecurityCalculator.SummarizeTool(SecurityTool.Defender, fleet, open);
+
+        Assert.Equal(2, summary.Affected);
+        Assert.Equal(1, summary.Healthy);
+        Assert.Equal(1, summary.OpenFindings);
+        Assert.Equal(1, summary.StatusCounts["offline"]);
+    }
 }

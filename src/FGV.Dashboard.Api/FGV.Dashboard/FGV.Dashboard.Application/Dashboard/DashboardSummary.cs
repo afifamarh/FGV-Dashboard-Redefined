@@ -17,4 +17,8 @@ public sealed record DashboardSummary(
     int MissingUpdates,
     SccmSummary Sccm,
     int HardeningScore,
+    SeverityCounts OpenBySeverity,
+    SeverityCounts ResolvedBySeverity,
+    IReadOnlyList<ToolSummary> Tools,
+    IReadOnlyList<WeeklyCount> WeeklyTrend,
     DateTimeOffset GeneratedUtc);

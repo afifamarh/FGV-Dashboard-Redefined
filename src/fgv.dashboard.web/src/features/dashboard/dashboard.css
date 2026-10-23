@@ -211,3 +211,141 @@
     outline: 2px solid var(--blue);
     outline-offset: -2px;
 }
+
+.section-head {
+    margin-top: 6px;
+}
+
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+@media (max-width: 1100px) {
+    .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .grid-4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tool-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    transition: box-shadow .15s, border-color .15s;
+}
+
+    .tool-card:hover {
+        box-shadow: var(--shadow-lg);
+        border-color: #C9D4EA;
+    }
+
+.tool-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.tool-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tool-name {
+    font-weight: 700;
+    font-size: 13.5px;
+}
+
+.tool-card-head .badge {
+    margin-left: auto;
+}
+
+.tool-metric-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    padding: 6px 0;
+    border-top: 1px dashed var(--border);
+}
+
+    .tool-metric-row:first-of-type {
+        border-top: none;
+    }
+
+    .tool-metric-row .k {
+        color: var(--text-muted);
+    }
+
+    .tool-metric-row .v {
+        font-weight: 600;
+    }
+
+.tool-card-link {
+    width: 100%;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 960px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+    .chart-panel .panel-head {
+        justify-content: center;
+        text-align: center;
+    }
+
+.chart-wrap {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+.doughnut-center {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 42%;
+    transform: translateY(-50%);
+    text-align: center;
+    pointer-events: none;
+}
+
+    .doughnut-center .val {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .doughnut-center .lbl {
+        font-size: 11px;
+        color: var(--text-muted);
+    }

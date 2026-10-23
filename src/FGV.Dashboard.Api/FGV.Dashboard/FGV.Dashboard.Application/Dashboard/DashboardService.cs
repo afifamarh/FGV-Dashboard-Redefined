@@ -20,12 +20,18 @@ public sealed class DashboardService
     {
         var endpoints = await _source.GetEndpointsAsync(cancellationToken);
         var vulnerabilities = await _source.GetVulnerabilitiesAsync(cancellationToken);
+        var now = _time.GetUtcNow();
 
         var overall = endpoints.Select(SecurityCalculator.ComputeOverall).ToList();
         int Count(OverallStatus status) => overall.Count(o => o == status);
 
         var open = vulnerabilities.Where(v => !v.IsResolved).ToList();
+        var resolved = vulnerabilities.Where(v => v.IsResolved).ToList();
         var endpointsWithOpenFindings = open.Select(v => v.EndpointId).ToHashSet();
+
+        var tools = Enum.GetValues<SecurityTool>()
+            .Select(tool => SecurityCalculator.SummarizeTool(tool, endpoints, open))
+            .ToList();
 
         return new DashboardSummary(
             endpoints.Count,
@@ -42,6 +48,10 @@ public sealed class DashboardService
             endpoints.Sum(e => e.MissingUpdates),
             SecurityCalculator.Sccm(endpoints),
             SecurityCalculator.FleetHardeningScore(endpoints),
-            _time.GetUtcNow());
+            SecurityCalculator.CountBySeverity(open),
+            SecurityCalculator.CountBySeverity(resolved),
+            tools,
+            SecurityCalculator.WeeklyVulnerabilityTrend(vulnerabilities.ToList(), now),
+            now);
     }
 }

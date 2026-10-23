@@ -2,11 +2,16 @@ import { Bug, RefreshCw, Shield, SlidersHorizontal, TriangleAlert } from 'lucide
 import { useNavigate } from 'react-router';
 import { useApi } from '../../shared/api/useApi';
 import { formatCount, formatDateTime, formatPercent, percentOf } from '../../shared/format';
+import CoverageChart from './charts/CoverageChart';
+import SeverityChart from './charts/SeverityChart';
+import StatusChart from './charts/StatusChart';
+import TrendChart from './charts/TrendChart';
 import { fetchDashboardSummary } from './dashboardApi';
 import ExecutiveKpiBar from './ExecutiveKpiBar';
 import KpiCard from './KpiCard';
 import type { KpiCardProps } from './KpiCard';
 import PostureHero from './PostureHero';
+import ToolCard from './ToolCard';
 import './dashboard.css';
 
 export default function DashboardPage() {
@@ -95,6 +100,27 @@ export default function DashboardPage() {
                         {kpis.map(({ to, ...card }) => (
                             <KpiCard key={card.label} {...card} onClick={() => navigate(to)} />
                         ))}
+                    </div>
+
+                    <div className="panel-head section-head">
+                        <div>
+                            <h3>Security tools</h3>
+                            <div className="panel-sub">
+                                Core data sources powering this dashboard (sample data in this prototype)
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid-4">
+                        {data.tools.map((tool) => (
+                            <ToolCard key={tool.key} tool={tool} summary={data} />
+                        ))}
+                    </div>
+
+                    <div className="chart-grid">
+                        <StatusChart summary={data} />
+                        <SeverityChart summary={data} />
+                        <CoverageChart summary={data} />
+                        <TrendChart summary={data} />
                     </div>
                 </>
             )}

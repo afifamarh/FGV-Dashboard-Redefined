@@ -33,7 +33,9 @@ public sealed class SyntheticSecurityDataSource : ISecurityDataSource
                 Pick(rng, (RiskLevel.Low, 55), (RiskLevel.Medium, 30), (RiskLevel.High, 11), (RiskLevel.Critical, 4)),
                 applicable,
                 installed,
-                new EndpointConfig(Chance(rng, 92), Chance(rng, 85), Chance(rng, 80), Chance(rng, 90))));
+                new EndpointConfig(Chance(rng, 92), Chance(rng, 85), Chance(rng, 80), Chance(rng, 90)),
+                Pick(rng, ("Windows 11 Pro", 50), ("Windows 10 Pro", 35), ("Windows Server 2022", 15)),
+                Pick(rng, ("HQ", 40), ("Plant 1", 25), ("Plant 2", 20), ("Regional Office", 15))));
 
             var findings = Chance(rng, 55) ? rng.Next(1, 4) : 0;
             for (var v = 1; v <= findings; v++)
@@ -42,6 +44,7 @@ public sealed class SyntheticSecurityDataSource : ISecurityDataSource
                     $"VULN-{i:D4}-{v}",
                     id,
                     Pick(rng, (Severity.Critical, 8), (Severity.High, 27), (Severity.Medium, 45), (Severity.Low, 20)),
+                    Pick(rng, (SecurityTool.Defender, 35), (SecurityTool.Sccm, 20), (SecurityTool.Kaspersky, 20), (SecurityTool.TrendMicro, 25)),
                     Chance(rng, 40),
                     now.AddDays(-rng.Next(0, 56))));
             }

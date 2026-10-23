@@ -1,20 +1,26 @@
-using FGV.Dashboard.Application.Dashboard;
-using FGV.Dashboard.Application.Security;
-using FGV.Dashboard.Infrastructure.SampleData;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FGV.Dashboard.Application.About;
+using FGV.Dashboard.Application.Dashboard;
+using FGV.Dashboard.Application.Endpoints;
+using FGV.Dashboard.Application.Security;
 using FGV.Dashboard.Infrastructure.About;
+using FGV.Dashboard.Infrastructure.SampleData;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(
+        new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<ISecurityDataSource, SyntheticSecurityDataSource>();
-builder.Services.AddScoped<DashboardService>();
 
 builder.Services.AddSingleton<IAppInfoProvider>(
     new AppInfoProvider(builder.Environment.EnvironmentName));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ISecurityDataSource, SyntheticSecurityDataSource>();
+builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<EndpointService>();
 
 var app = builder.Build();
 
@@ -30,4 +36,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
