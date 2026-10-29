@@ -47,3 +47,17 @@ public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSi
 {
     public int TotalPages => PageSize <= 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
 }
+
+public sealed record ControlResult(string Key, string Name, string Source, bool Passed);
+
+public sealed record OpenFinding(string Id, Severity Severity, SecurityTool Source, DateTimeOffset DetectedUtc);
+
+public sealed record EndpointDetail(
+    EndpointListItem Summary,
+    int PatchApplicable,
+    int PatchInstalled,
+    int HardeningScore,
+    int PassedControls,
+    RecommendedAction RecommendedAction,
+    IReadOnlyList<ControlResult> Controls,
+    IReadOnlyList<OpenFinding> OpenFindings);

@@ -33,8 +33,12 @@ public sealed record Vulnerability(
     string EndpointId,
     Severity Severity,
     SecurityTool Source,
-    bool IsResolved,
-    DateTimeOffset DetectedUtc);
+    VulnerabilityStatus Status,
+    DateTimeOffset DetectedUtc,
+    string Description = "")
+{
+    public bool IsResolved => Status == VulnerabilityStatus.Resolved;
+}
 
 public sealed record SccmSummary(
     int Total,

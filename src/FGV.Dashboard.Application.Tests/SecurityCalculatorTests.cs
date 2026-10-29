@@ -81,7 +81,7 @@ public class SecurityCalculatorTests
     Severity severity = Severity.High,
     SecurityTool source = SecurityTool.Defender,
     bool resolved = false) =>
-    new(id, "EP-1", severity, source, resolved, detected);
+            new(id, "EP-1", severity, source, resolved ? VulnerabilityStatus.Resolved : VulnerabilityStatus.Open, detected);
 
     [Fact]
     public void Weekly_trend_has_eight_monday_based_weeks_ending_at_the_latest_detection()

@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import StatusBadge from '../../shared/ui/StatusBadge';
 import type { EndpointListItem } from './endpointsApi';
 import { overallDisplay, patchDisplay, protectionDisplay, riskDisplay } from './statusDisplay';
@@ -54,7 +55,9 @@ export default function EndpointsTable({ items, sortBy, descending, onSort }: En
                 {items.map((e) => (
                     <tr key={e.id}>
                         <td>
-                            <b>{e.hostname}</b>
+                            <Link to={`/endpoints/${encodeURIComponent(e.id)}`}>
+                                <b>{e.hostname}</b>
+                            </Link>
                             <span className="cell-sub">{e.id}</span>
                         </td>
                         <td>{e.ipAddress ?? '—'}</td>

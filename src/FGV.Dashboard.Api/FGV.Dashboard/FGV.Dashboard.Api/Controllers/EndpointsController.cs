@@ -22,4 +22,14 @@ public sealed class EndpointsController : ControllerBase
         var result = await _service.QueryAsync(request.ToQuery(), cancellationToken);
         return result;
     }
+
+    [HttpGet("{id:maxlength(50)}")]
+    [ProducesResponseType<EndpointDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<EndpointDetail>> Get(string id, CancellationToken cancellationToken)
+    {
+        var detail = await _service.GetDetailAsync(id, cancellationToken);
+        if (detail is null) return NotFound();
+        return detail;
+    }
 }

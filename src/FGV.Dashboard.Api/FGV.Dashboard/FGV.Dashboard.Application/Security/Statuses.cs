@@ -11,4 +11,10 @@ namespace FGV.Dashboard.Application.Security
     public enum OverallStatus { Unknown, Protected, AttentionRequired, Critical, Offline }
 
     public enum SecurityTool { Defender, Sccm, Kaspersky, TrendMicro }
+
+    public enum RecommendedAction { MonitorAsUsual, ReviewAndSchedule, IsolateAndRemediate, ReconnectAndVerify }
+
+    public enum VulnerabilityStatus { Open, InProgress, Resolved }
+
+
 }

@@ -8,6 +8,19 @@ namespace FGV.Dashboard.Infrastructure.SampleData;
 /// <summary>Deterministic, fictional data for development. Contains no real FGV records.</summary>
 public sealed class SyntheticSecurityDataSource : ISecurityDataSource
 {
+
+    private static readonly string[] Descriptions =
+[
+    "Outdated TLS configuration enabled",
+        "Missing operating system security update",
+        "Unpatched third-party application",
+        "Weak password policy on local accounts",
+        "Unsupported component still installed",
+        "Administrative share exposed to the network",
+        "Endpoint protection signatures out of date",
+        "Legacy protocol enabled",
+    ];
+
     private readonly IReadOnlyList<EndpointAsset> _endpoints;
     private readonly IReadOnlyList<Vulnerability> _vulnerabilities;
 
@@ -45,8 +58,9 @@ public sealed class SyntheticSecurityDataSource : ISecurityDataSource
                     id,
                     Pick(rng, (Severity.Critical, 8), (Severity.High, 27), (Severity.Medium, 45), (Severity.Low, 20)),
                     Pick(rng, (SecurityTool.Defender, 35), (SecurityTool.Sccm, 20), (SecurityTool.Kaspersky, 20), (SecurityTool.TrendMicro, 25)),
-                    Chance(rng, 40),
-                    now.AddDays(-rng.Next(0, 56))));
+                    Pick(rng, (VulnerabilityStatus.Open, 35), (VulnerabilityStatus.InProgress, 25), (VulnerabilityStatus.Resolved, 40)),
+                    now.AddDays(-rng.Next(0, 56)),
+                    Descriptions[rng.Next(Descriptions.Length)]));
             }
         }
 

@@ -93,4 +93,35 @@ public sealed class EndpointService
             SecurityPolicy.PatchPercent(e.PatchApplicable, e.PatchInstalled),
             e.MissingUpdates);
     }
+
+    public async Task<EndpointDetail?> GetDetailAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var endpoints = await _source.GetEndpointsAsync(cancellationToken);
+        var asset = endpoints.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.Ordinal));
+        if (asset is null) return null;
+
+        var vulnerabilities = await _source.GetVulnerabilitiesAsync(cancellationToken);
+        var overall = SecurityCalculator.ComputeOverall(asset);
+
+        var controls = HardeningControls.All
+            .Select(c => new ControlResult(c.Key, c.Name, c.Source, c.Check(asset)))
+            .ToList();
+
+        var openFindings = vulnerabilities
+            .Where(v => v.EndpointId == asset.Id && !v.IsResolved)
+            .OrderBy(v => v.Severity)
+            .ThenByDescending(v => v.DetectedUtc)
+            .Select(v => new OpenFinding(v.Id, v.Severity, v.Source, v.DetectedUtc))
+            .ToList();
+
+        return new EndpointDetail(
+            ToItem(new Row(asset, overall)),
+            asset.PatchApplicable,
+            asset.PatchInstalled,
+            SecurityCalculator.EndpointHardeningScore(asset),
+            controls.Count(c => c.Passed),
+            SecurityCalculator.RecommendAction(overall),
+            controls,
+            openFindings);
+    }
 }

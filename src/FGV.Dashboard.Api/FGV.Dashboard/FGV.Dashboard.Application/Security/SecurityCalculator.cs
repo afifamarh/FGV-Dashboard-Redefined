@@ -29,7 +29,7 @@ namespace FGV.Dashboard.Application.Security
 
     public static class SecurityCalculator
     {
-        public const int HardeningControlCount = 8;
+        public static int HardeningControlCount => HardeningControls.All.Count;
 
         public static OverallStatus ComputeOverall(EndpointAsset e)
         {
@@ -50,19 +50,18 @@ namespace FGV.Dashboard.Application.Security
             return risks >= 1 ? OverallStatus.AttentionRequired : OverallStatus.Protected;
         }
 
-        public static int PassedControls(EndpointAsset e)
+        public static int PassedControls(EndpointAsset e) => HardeningControls.All.Count(c => c.Check(e));
+
+        public static int EndpointHardeningScore(EndpointAsset e) =>
+            (int)Math.Round(PassedControls(e) * 100.0 / HardeningControlCount, MidpointRounding.AwayFromZero);
+
+        public static RecommendedAction RecommendAction(OverallStatus overall) => overall switch
         {
-            var passed = 0;
-            if (e.Patch == PatchState.Compliant) passed++;
-            if (e.Kaspersky == ProtectionStatus.Protected) passed++;
-            if (e.Defender == ProtectionStatus.Protected) passed++;
-            if (e.TrendMicro is RiskLevel.Low or RiskLevel.Medium) passed++;
-            if (e.Config.Firewall) passed++;
-            if (e.Config.DiskEncryption) passed++;
-            if (e.Config.UsbControl) passed++;
-            if (e.Config.PasswordPolicy) passed++;
-            return passed;
-        }
+            OverallStatus.Protected => RecommendedAction.MonitorAsUsual,
+            OverallStatus.Critical => RecommendedAction.IsolateAndRemediate,
+            OverallStatus.Offline => RecommendedAction.ReconnectAndVerify,
+            _ => RecommendedAction.ReviewAndSchedule,
+        };
 
         public static int FleetHardeningScore(IReadOnlyCollection<EndpointAsset> fleet)
         {

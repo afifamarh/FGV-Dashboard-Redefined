@@ -8,12 +8,18 @@ export interface KpiCardProps {
     sub?: string;
     tone: KpiTone;
     icon: LucideIcon;
+    active?: boolean;
     onClick?: () => void;
 }
 
-export default function KpiCard({ label, value, sub, tone, icon: Icon, onClick }: KpiCardProps) {
+export default function KpiCard({ label, value, sub, tone, icon: Icon, active, onClick }: KpiCardProps) {
     return (
-        <button type="button" className="kpi-card" onClick={onClick}>
+        <button
+            type="button"
+            className={active ? 'kpi-card active' : 'kpi-card'}
+            aria-pressed={active}
+            onClick={onClick}
+        >
             <span className="kpi-top">
                 <span className="kpi-label">{label}</span>
                 <span className={`kpi-icon tone-${tone}`}>

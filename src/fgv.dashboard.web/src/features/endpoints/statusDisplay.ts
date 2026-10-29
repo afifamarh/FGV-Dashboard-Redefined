@@ -1,4 +1,6 @@
-import type { OverallStatus, PatchState, ProtectionStatus, RiskLevel } from './endpointsApi';
+import type {
+    OverallStatus, PatchState, ProtectionStatus, RiskLevel, SecurityTool, Severity,
+} from './endpointsApi';
 
 export type BadgeTone = 'green' | 'amber' | 'red' | 'blue' | 'slate';
 
@@ -49,3 +51,17 @@ export const DEFENDER_OPTIONS = toOptions(protectionDisplay, ['protected', 'atRi
 export const PATCH_OPTIONS = toOptions(patchDisplay, ['compliant', 'nonCompliant', 'unknown']);
 export const KASPERSKY_OPTIONS = toOptions(protectionDisplay, ['protected', 'atRisk']);
 export const RISK_OPTIONS = toOptions(riskDisplay, ['low', 'medium', 'high', 'critical']);
+
+export const severityDisplay: Record<Severity, Display> = {
+    critical: { label: 'Critical', tone: 'red' },
+    high: { label: 'High', tone: 'amber' },
+    medium: { label: 'Medium', tone: 'blue' },
+    low: { label: 'Low', tone: 'slate' },
+};
+
+export const toolName: Record<SecurityTool, string> = {
+    defender: 'Microsoft Defender',
+    sccm: 'SCCM',
+    kaspersky: 'Kaspersky',
+    trendMicro: 'Trend Micro Vision One',
+};

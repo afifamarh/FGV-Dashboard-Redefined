@@ -6,6 +6,7 @@ using FGV.Dashboard.Application.Endpoints;
 using FGV.Dashboard.Application.Security;
 using FGV.Dashboard.Infrastructure.About;
 using FGV.Dashboard.Infrastructure.SampleData;
+using FGV.Dashboard.Application.Vulnerabilities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ISecurityDataSource, SyntheticSecurityDataSource>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<EndpointService>();
+builder.Services.AddScoped<VulnerabilityService>();
 
 var app = builder.Build();
 
